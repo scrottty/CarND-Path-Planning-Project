@@ -9,6 +9,7 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 #include "spline.h"
+#include "constants.h"
 #include "helperFunctions.h"
 
 using namespace std;
@@ -164,10 +165,12 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 enum vehicle_state 
 {
     keep_lane = 0,
-    prepare_lane_change_left,
-    prepare_lane_change_right,
-    lane_change_left,
-    lane_change_right
+    prepare_lane_change,
+    lane_change
+    // prepare_lane_change_left,
+    // prepare_lane_change_right,
+    // lane_change_left,
+    // lane_change_right
 };
 
 int main() {
@@ -212,17 +215,17 @@ int main() {
   
   // Start in the middle lane
   int lane = 1;
+  int new_lane = 1;
   
   // Get close to the speed limit
   double ref_vel = 0.0;
-  double MAX_VEL = 49.5;
-  double target_vel = 49.5;
+  double target_vel = MAX_VELOCITY;
   
   // Keep driving comfortable
   double max_acc = 8;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, 
-      &ref_vel, &MAX_VEL, &target_vel, &lane, &ego_state, &max_acc]
+      &ref_vel, &target_vel, &lane, &new_lane, &ego_state, &max_acc]
       (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -269,22 +272,65 @@ int main() {
                 car_s = end_path_s;
             }
             
+            // Split vehicles by lane
+            vector<vector<vector<double>>> lane_vehicles;
+            SplitVehicelsIntoLanes(sensor_fusion, lane_vehicles, car_s);
+            
+            // Get the vehicles that are within a distance if the car
+            vector<vector<vector<double>>> safety_vehicles;
+            FilterVehiclesForSafety(lane_vehicles, safety_vehicles);
+            
             int lane_middle = 2 + 4*lane; 
             bool slow_vehicle = false;
+            
+            cout << "Vehicle State: " << ego_state << endl;
             // BEHAVIOUR PLANNING
             switch (ego_state) 
             {
                 case keep_lane:
-                    slow_vehicle = CheckFrontCollision(sensor_fusion, car_s, lane_middle, prev_size, target_vel);
+                {
+                    slow_vehicle = CheckFrontCollision(safety_vehicles[lane], car_s, prev_size, target_vel);
+                    if (slow_vehicle)
+                    {
+                        // Choose lane return -1 for left change, 0 for stay, 1 for right change
+                        new_lane = lane + ChooseLane(safety_vehicles, lane, car_s);
+                        if (new_lane != lane)
+                            ego_state = prepare_lane_change;
+                    }
+                    // maybe move back to the middle when empty
                     break;
-                case prepare_lane_change_left:
+                }
+                case prepare_lane_change:
+                {
+                    if (CheckLaneIsSafe(safety_vehicles[new_lane]))
+                    {
+                        ego_state = lane_change;
+                        target_vel = MAX_VELOCITY;
+                    }
+                    else
+                    {
+                        ego_state = keep_lane;
+                    }
                     break;
-                case prepare_lane_change_right:
+                }
+                case lane_change:
+                {
+                    lane = new_lane;
+                    int new_middle = 2+4*new_lane;
+                    // only move back to the keep_lane state when we are in the mdiddle of the new lane
+                    if (car_d>new_middle-1.5 && car_d<new_middle+1.5)
+                        ego_state = keep_lane;
+                    
                     break;
-                case lane_change_left:
-                    break;
-                case lane_change_right:
-                    break;
+                }
+                // case prepare_lane_change_left:
+                //     break;
+                // case prepare_lane_change_right:
+                //     break;
+                // case lane_change_left:
+                //     break;
+                // case lane_change_right:
+                //     break;
                 default:
                     break;
             }
@@ -410,6 +456,7 @@ int main() {
             // Fill in the points for the spline
             for (int i=1; i<50-previous_path_x.size(); i++)
             {
+                // DO NEED AN EMERGENCY STOP!!!
                 if (ref_vel > target_vel) 
                 {
                     // Can slow down slower if dotn need to avoid
