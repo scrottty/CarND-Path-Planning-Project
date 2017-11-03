@@ -163,6 +163,7 @@ CMakeFiles/path_planning.dir/src/main.cpp.o: ../src/constants.h
 CMakeFiles/path_planning.dir/src/main.cpp.o: ../src/helperFunctions.h
 CMakeFiles/path_planning.dir/src/main.cpp.o: ../src/json.hpp
 CMakeFiles/path_planning.dir/src/main.cpp.o: ../src/main.cpp
+CMakeFiles/path_planning.dir/src/main.cpp.o: ../src/providedFunctions.h
 CMakeFiles/path_planning.dir/src/main.cpp.o: ../src/spline.h
 CMakeFiles/path_planning.dir/src/main.cpp.o: /usr/local/include/pthread-barrier.h
 CMakeFiles/path_planning.dir/src/main.cpp.o: /usr/local/include/uWS/Extensions.h

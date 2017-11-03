@@ -773,6 +773,8 @@ lapacke_mangling.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Eigen-3.3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
+vector
+-
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/helperFunctions.h
 vector
@@ -783,8 +785,12 @@ iostream
 -
 algorithm
 -
+providedFunctions.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/providedFunctions.h
 constants.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
+spline.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/json.hpp
 algorithm
@@ -863,12 +869,20 @@ Eigen-3.3/Eigen/QR
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Eigen-3.3/Eigen/QR
 json.hpp
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/json.hpp
+providedFunctions.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/providedFunctions.h
 spline.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
 constants.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
 helperFunctions.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/helperFunctions.h
+
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/providedFunctions.h
+math.h
+-
+vector
+-
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
 cstdio
