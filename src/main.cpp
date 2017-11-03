@@ -214,8 +214,9 @@ int main() {
   vehicle_state ego_state = keep_lane;
   
   // Start in the middle lane
-  int lane = 1;
+  int current_lane = 1;
   int new_lane = 1;
+  int old_lane = 1;
   
   // Get close to the speed limit
   double ref_vel = 0.0;
@@ -225,7 +226,7 @@ int main() {
   double max_acc = 8;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, 
-      &ref_vel, &target_vel, &lane, &new_lane, &ego_state, &max_acc]
+      &ref_vel, &target_vel, &current_lane, &new_lane, &old_lane, &ego_state, &max_acc]
       (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -276,12 +277,22 @@ int main() {
             vector<vector<vector<double>>> lane_vehicles;
             SplitVehicelsIntoLanes(sensor_fusion, lane_vehicles, car_s);
             
-            // Get the vehicles that are within a distance if the car
+            // Get the vehicles that are within a safety distance if the car
             vector<vector<vector<double>>> safety_vehicles;
             FilterVehiclesForSafety(lane_vehicles, safety_vehicles);
             
-            int lane_middle = 2 + 4*lane; 
+            //Get the vehicles that within a distance to effect performance decisions
+            vector<vector<vector<double>>> performance_vehicles;
+            FilterVehiclesForPerformance(lane_vehicles, performance_vehicles);
+            
+            int lane_middle = 2 + 4*current_lane; 
             bool slow_vehicle = false;
+            
+            // Check for potential collision
+            bool avoid_vehicle = CheckFrontCollision(lane_vehicles[current_lane], car_s, prev_size, target_vel);
+            // Run the collision detection on the old lane as well to make sure we dont clip the car in front
+            if (ego_state == lane_change) 
+                avoid_vehicle = avoid_vehicle || CheckFrontCollision(lane_vehicles[old_lane], car_s, prev_size, target_vel);
             
             cout << "Vehicle State: " << ego_state << endl;
             // BEHAVIOUR PLANNING
@@ -289,14 +300,16 @@ int main() {
             {
                 case keep_lane:
                 {
-                    slow_vehicle = CheckFrontCollision(safety_vehicles[lane], car_s, prev_size, target_vel);
+                    slow_vehicle = CheckSlowVehicle(safety_vehicles[current_lane], car_s, prev_size, target_vel);
                     if (slow_vehicle)
                     {
                         // Choose lane return -1 for left change, 0 for stay, 1 for right change
-                        new_lane = lane + ChooseLane(safety_vehicles, lane, car_s);
-                        if (new_lane != lane)
+                        new_lane = current_lane + ChooseLane(safety_vehicles, current_lane, car_s);
+                        if (new_lane != current_lane)
                             ego_state = prepare_lane_change;
                     }
+                    else
+                        target_vel = MAX_VELOCITY;
                     // maybe move back to the middle when empty
                     break;
                 }
@@ -304,6 +317,7 @@ int main() {
                 {
                     if (CheckLaneIsSafe(safety_vehicles[new_lane]))
                     {
+                        // MAKE SURE NOT TOO CLOSE TO VEHICLE IN FRONT
                         ego_state = lane_change;
                         target_vel = MAX_VELOCITY;
                     }
@@ -315,7 +329,8 @@ int main() {
                 }
                 case lane_change:
                 {
-                    lane = new_lane;
+                    old_lane = current_lane;
+                    current_lane = new_lane;
                     int new_middle = 2+4*new_lane;
                     // only move back to the keep_lane state when we are in the mdiddle of the new lane
                     if (car_d>new_middle-1.5 && car_d<new_middle+1.5)
@@ -406,9 +421,9 @@ int main() {
             }
             
             // In Frenet add evenly spaced points ahead of starting position
-            vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp1 = getXY(car_s+60, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp2 = getXY(car_s+90, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp0 = getXY(car_s+30, (2+4*current_lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp1 = getXY(car_s+60, (2+4*current_lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp2 = getXY(car_s+90, (2+4*current_lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             
             ptsx.push_back(next_wp0[0]);
             ptsx.push_back(next_wp1[0]);
@@ -456,8 +471,11 @@ int main() {
             // Fill in the points for the spline
             for (int i=1; i<50-previous_path_x.size(); i++)
             {
-                // DO NEED AN EMERGENCY STOP!!!
-                if (ref_vel > target_vel) 
+                if (avoid_vehicle) // Too close to vehilce do maximum de accleration
+                {
+                    ref_vel -= 0.4; // Not the full deacceleration but close
+                }
+                else if (ref_vel > target_vel) 
                 {
                     // Can slow down slower if dotn need to avoid
                     ref_vel -= 0.112;

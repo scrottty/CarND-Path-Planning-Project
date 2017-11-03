@@ -10,14 +10,38 @@
 using namespace std;
 
 const int DIST_TO_CAR_IN_FRONT              = 30;
+const int DIST_FOR_SLOW_DOWN                = 20;
 const int EMERGENCY_DIST                    = 10;
 const int LEFT_LANE_MAX                     = 4;
 const int RIGHT_LANE_MIN                    = 8;
-const int FRONT_MOST_DISTANCE               = 5;
-const int BACK_MOST_DISTANCE                = -20;
+const int FRONT_MOST_DISTANCE_SAFETY        = 10;
+const int BACK_MOST_DISTANCE_SAFETY         = -20;
+const int FRONT_MOST_DISTANCE_PERFORMANCE   = 100;
+const int BACK_MOST_DISTANCE_PERFORAMCE     = -20;
 const int MIN_GAP_SIZE                      = 5;
 
-bool CheckFrontCollision(vector<vector<double>> safety_vehicles, double car_s, int prev_size, double &new_speed)
+bool CheckFrontCollision(vector<vector<double>> lane_vehicles, double car_s, int prev_size, double &new_speed)
+{
+    // Loop through all the vehicles in my lane, if within a distance match speed and flag for a lane change
+    for (int i=0; i < lane_vehicles.size(); i++)
+    {
+        double vx = lane_vehicles[i][3];
+        double vy = lane_vehicles[i][4];
+        double check_speed = sqrt(vx*vx+vy*vy);
+        double check_car_s = lane_vehicles[i][5];
+        
+        check_car_s += ((double)prev_size*0.02*check_speed);
+        if ((check_car_s > car_s) && (check_car_s-car_s) < EMERGENCY_DIST)
+        {
+            cout << "Im behind: " << lane_vehicles[i][0] << " - GETTING TOO CLOSE" << endl;
+            new_speed = check_speed*2.24 - 10;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CheckSlowVehicle(vector<vector<double>> safety_vehicles, double car_s, int prev_size, double &new_speed)
 {
     // Loop through the vehicles in my lane, if within a distance match speed and flag for a lane change
     for (int i=0; i < safety_vehicles.size(); i++)
@@ -28,16 +52,14 @@ bool CheckFrontCollision(vector<vector<double>> safety_vehicles, double car_s, i
         double check_car_s = safety_vehicles[i][5];
         
         check_car_s += ((double)prev_size*0.02*check_speed);
-        if ((check_car_s > car_s) && (check_car_s-car_s) < EMERGENCY_DIST)
-        {
-            cout << "Im behind: " << safety_vehicles[i][0] << " - GETTING TOO CLOSE" << endl;
-            new_speed = check_speed*2.24 - 10;
-            return true;
-        }
         if ((check_car_s > car_s) && (check_car_s-car_s) < DIST_TO_CAR_IN_FRONT)
         {
             cout << "Im behind: " << safety_vehicles[i][0] << endl;
-            new_speed = check_speed*2.24;
+            // Match their speed if not too close
+            if ((check_car_s-car_s) > DIST_FOR_SLOW_DOWN)
+                new_speed = check_speed*2.24;
+            else
+                new_speed = check_speed*2.24-2;
             return true;
         }
     }
@@ -84,7 +106,7 @@ void FilterVehiclesForSafety( vector<vector<vector<double>>> lane_vehicles, vect
         for (int j=0; j<lane_vehicles[i].size(); j++)
         {
             double relative_distance = lane_vehicles[i][j][7];
-            if (relative_distance > BACK_MOST_DISTANCE+1 && relative_distance < FRONT_MOST_DISTANCE)
+            if (relative_distance > BACK_MOST_DISTANCE_SAFETY+1 && relative_distance < FRONT_MOST_DISTANCE_SAFETY)
             {
                 if (i==0)
                     close_left_lane_vehicles.push_back(lane_vehicles[i][j]);
@@ -98,6 +120,33 @@ void FilterVehiclesForSafety( vector<vector<vector<double>>> lane_vehicles, vect
     safety_vehicles.push_back(close_left_lane_vehicles);
     safety_vehicles.push_back(close_middle_lane_vehicles);
     safety_vehicles.push_back(close_right_lane_vehicles);
+}
+
+void FilterVehiclesForPerformance( vector<vector<vector<double>>> lane_vehicles, vector<vector<vector<double>>>& performance_vehicles)
+{
+    // Filter cars on the lanes by position to find only the relavent cars (safety)
+    vector<vector<double>> relavant_left_lane_vehicles;
+    vector<vector<double>> relavant_middle_lane_vehicles;
+    vector<vector<double>> relavant_right_lane_vehicles;
+    for (int i=0; i<3; i++)
+    {        
+        for (int j=0; j<lane_vehicles[i].size(); j++)
+        {
+            double relative_distance = lane_vehicles[i][j][7];
+            if (relative_distance > BACK_MOST_DISTANCE_PERFORAMCE+1 && relative_distance < FRONT_MOST_DISTANCE_PERFORMANCE)
+            {
+                if (i==0)
+                    relavant_left_lane_vehicles.push_back(lane_vehicles[i][j]);
+                else if (i==1)
+                    relavant_middle_lane_vehicles.push_back(lane_vehicles[i][j]);
+                else
+                    relavant_right_lane_vehicles.push_back(lane_vehicles[i][j]);
+            }
+        }
+    }    
+    performance_vehicles.push_back(relavant_left_lane_vehicles);
+    performance_vehicles.push_back(relavant_middle_lane_vehicles);
+    performance_vehicles.push_back(relavant_right_lane_vehicles);
 }
 
 // Returns -1 for move left, 0 for stay, 1 for move right
@@ -117,10 +166,10 @@ int ChooseLane( vector<vector<vector<double>>> safety_vehicles, int lane, double
     // // Cost weightings
     // double num_vechiles_weight = 1.0;
     
-    // If there are no vehicles in either lane take the right lane else take the empty lane
+    // If there are no vehicles in either lane take the left lane else take the empty lane
     if (safety_vehicles[0].size() == 0 && safety_vehicles[2].size() == 0)
     {
-        return 1;
+        return -1;
     }
     else if (safety_vehicles[0].size() == 0)
     {
