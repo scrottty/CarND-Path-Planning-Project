@@ -33,7 +33,7 @@ string hasData(string s) {
   return "";
 }
 
-enum vehicle_state 
+enum vehicle_state
 {
     keep_lane = 0,
     prepare_lane_change,
@@ -80,23 +80,23 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
-  
+
   // enum to control state machine
   vehicle_state ego_state = keep_lane;
-  
+
   // Start in the middle lane
   int current_lane = 1;
   int new_lane = 1;
   int old_lane = 1;
-  
+
   // Get close to the speed limit
   double ref_vel = 0.0;
   double target_vel = MAX_VELOCITY;
-  
+
   // Keep driving comfortable
   double max_acc = 8;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, 
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,
       &ref_vel, &target_vel, &current_lane, &new_lane, &old_lane, &ego_state, &max_acc]
       (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -110,12 +110,12 @@ int main() {
 
       if (s != "") {
         auto j = json::parse(s);
-        
+
         string event = j[0].get<string>();
-        
+
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          
+
         	// Main car's localization Data
           	double car_x = j[1]["x"];
           	double car_y = j[1]["y"];
@@ -134,7 +134,7 @@ int main() {
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
           	auto previous_path_y = j[1]["previous_path_y"];
-          	// Previous path's end s and d values 
+          	// Previous path's end s and d values
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
 
@@ -142,54 +142,58 @@ int main() {
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
           	json msgJson;
-            
+
             int prev_size = previous_path_x.size();
-            cout << prev_size << endl;
             // Adjust the cars position to be at the end of the planned trajectory
             if (prev_size > 0)
             {
                 car_s = end_path_s;
                 car_values[2] = end_path_s;
             }
-            
+
             // Split vehicles by lane
             vector<vector<vector<double>>> lane_vehicles;
             SplitVehicelsIntoLanes(sensor_fusion, lane_vehicles, car_s);
-            
+
             // Get the vehicles that are within a safety distance if the car
             vector<vector<vector<double>>> safety_vehicles;
             FilterVehiclesForSafety(lane_vehicles, safety_vehicles);
-            
+
             //Get the vehicles that within a distance to effect performance decisions
             vector<vector<vector<double>>> relevant_vehicles;
             FilterForRelaventVehicles(lane_vehicles, relevant_vehicles);
-            
-            int lane_middle = 2 + 4*current_lane; 
+
+            int lane_middle = 2 + 4*current_lane;
             bool slow_vehicle = false;
-            
+
             // Check for potential collision
             bool avoid_vehicle = CheckFrontCollision(lane_vehicles[current_lane], car_s, prev_size, target_vel);
             // Run the collision detection on the old lane as well to make sure we dont clip the car in front
-            if (ego_state == lane_change) 
+            if (ego_state == lane_change)
                 avoid_vehicle = avoid_vehicle || CheckFrontCollision(lane_vehicles[old_lane], car_s, prev_size, target_vel);
-            
-            cout << "Vehicle State: " << ego_state << endl;
+
+            // cout << "Vehicle State: " << ego_state << endl;
             // BEHAVIOUR PLANNING
-            switch (ego_state) 
+            switch (ego_state)
             {
                 case keep_lane:
                 {
-                    slow_vehicle = CheckSlowVehicle(safety_vehicles[current_lane], car_s, prev_size, target_vel);
-                    if (slow_vehicle)
-                    {
-                        // Choose lane return -1 for left change, 0 for stay, 1 for right change
-                        new_lane = current_lane + ChooseLane(safety_vehicles, relevant_vehicles, current_lane, car_s);
-                        if (new_lane != current_lane)
-                            ego_state = prepare_lane_change;
-                    }
-                    else
-                        target_vel = MAX_VELOCITY;
-                    // maybe move back to the middle when empty
+                    // slow_vehicle = CheckSlowVehicle(safety_vehicles[current_lane], car_s, prev_size, target_vel);
+                    // if (slow_vehicle)
+                    // {
+                    //     // Choose lane return -1 for left change, 0 for stay, 1 for right change
+                    //     new_lane = current_lane + ChooseLane(safety_vehicles, current_lane, car_s);
+                    //     if (new_lane != current_lane)
+                    //         ego_state = prepare_lane_change;
+                    // }
+                    // else
+                    //     target_vel = MAX_VELOCITY;
+                    // // maybe move back to the middle when empty
+                    new_lane = ChooseLane(relevant_vehicles, target_vel, ref_vel, current_lane, previous_path_x, previous_path_y, car_values,
+                                        map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                    if (new_lane != current_lane)
+                        ego_state = prepare_lane_change;
+
                     break;
                 }
                 case prepare_lane_change:
@@ -214,7 +218,7 @@ int main() {
                     // only move back to the keep_lane state when we are in the mdiddle of the new lane
                     if (car_d>new_middle-1.5 && car_d<new_middle+1.5)
                         ego_state = keep_lane;
-                    
+
                     break;
                 }
                 // case prepare_lane_change_left:
@@ -228,15 +232,17 @@ int main() {
                 default:
                     break;
             }
-            double distances_forward[] = {30,60,90};
-            int lanes[] = {current_lane,current_lane,current_lane};
-            vector<vector<double>> next_xy = CreateTrajectory(lanes, 
-                target_vel, ref_vel, 50, avoid_vehicle, previous_path_x, previous_path_y, 
+            vector<int> lanes;
+            lanes.push_back(current_lane);
+            lanes.push_back(current_lane);
+            lanes.push_back(current_lane);
+            vector<vector<double>> next_xy = CreateTrajectory(lanes,
+                target_vel, ref_vel, 50, avoid_vehicle, previous_path_x, previous_path_y,
                 car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            
+
          	msgJson["next_x"] = next_xy[0];
          	msgJson["next_y"] = next_xy[1];
-                
+
             // for (int i=0; i < sensor_fusion.size(); i++)
             // {
             //     // Car is my lane
@@ -247,12 +253,12 @@ int main() {
             //         double vy = sensor_fusion[i][4];
             //         double check_speed = sqrt(vx*vx+vy*vy);
             //         double check_car_s = sensor_fusion[i][5];
-            //         
+            //
             //         check_car_s += ((double)prev_size*0.02*check_speed);
             //         if ((check_car_s > car_s) && (check_car_s-car_s) < 30)
             //         {
             //             too_close = true;
-            //             
+            //
             //             if (lane > 0)
             //             {
             //                 lane = 0;
@@ -260,7 +266,7 @@ int main() {
             //         }
             //     }
             // }
-            
+
             // if (too_close)
             // {
             //     ref_vel -= 0.224;
@@ -269,26 +275,26 @@ int main() {
             // {
             //     ref_vel += 0.224;
             // }
-            
+
             /*
             // Create a list of widely spaced waypoint to interpolate between
             vector<double> ptsx;
             vector<double> ptsy;
-            
+
             // Reference x,y,yaw state
             double ref_x = car_x;
             double ref_y = car_y;
             double ref_yaw = deg2rad(car_yaw);
-            
+
             // If the previous path is almost empty, use the car as the starting reference
             if (prev_size < 2)
             {
                 double prev_car_x = car_x - cos(car_yaw);
                 double prev_car_y = car_y - sin(car_yaw);
-                
+
                 ptsx.push_back(prev_car_x);
                 ptsx.push_back(car_x);
-                
+
                 ptsy.push_back(prev_car_y);
                 ptsy.push_back(car_y);
             }
@@ -296,51 +302,51 @@ int main() {
             {
                 ref_x = previous_path_x[prev_size-1];
                 ref_y = previous_path_y[prev_size-1];
-                
+
                 double ref_x_prev = previous_path_x[prev_size-2];
                 double ref_y_prev = previous_path_y[prev_size-2];
                 ref_yaw = atan2(ref_y-ref_y_prev, ref_x-ref_x_prev);
                 // Use the two points to make the path tangent to the previous path's ebd point
                 ptsx.push_back(ref_x_prev);
                 ptsx.push_back(ref_x);
-                
+
                 ptsy.push_back(ref_y_prev);
                 ptsy.push_back(ref_y);
             }
-            
+
             // In Frenet add evenly spaced points ahead of starting position
             vector<double> next_wp0 = getXY(car_s+30, (2+4*current_lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             vector<double> next_wp1 = getXY(car_s+60, (2+4*current_lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             vector<double> next_wp2 = getXY(car_s+90, (2+4*current_lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            
+
             ptsx.push_back(next_wp0[0]);
             ptsx.push_back(next_wp1[0]);
             ptsx.push_back(next_wp2[0]);
-            
+
             ptsy.push_back(next_wp0[1]);
             ptsy.push_back(next_wp1[1]);
             ptsy.push_back(next_wp2[1]);
-            
+
             for (int i=0; i < ptsx.size(); i++)
             {
                 // Shift car reference angle to 0 degress
                 double shift_x = ptsx[i]-ref_x;
                 double shift_y = ptsy[i]-ref_y;
-                
+
                 ptsx[i] = (shift_x * cos(0-ref_yaw) - shift_y * sin(0-ref_yaw));
                 ptsy[i] = (shift_x * sin(0-ref_yaw) + shift_y * cos(0-ref_yaw));
             }
-            
+
             // Create Spline
             tk::spline s;
-            
+
             // Set (x,y) ppints to the spline
             s.set_points(ptsx, ptsy);
-            
-            // Define the actual path point we will use for the planner    
+
+            // Define the actual path point we will use for the planner
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
-            
+
             // Start with all of the remaining previous path points
             // Note: points travelled by the vehicle are removed from the previous path
             for (int i=0; i<previous_path_x.size(); i++)
@@ -348,12 +354,12 @@ int main() {
                 next_x_vals.push_back(previous_path_x[i]);
                 next_y_vals.push_back(previous_path_y[i]);
             }
-            
+
             // Calc how to break up the spline points so that we travel at the desired velocity
             double target_x = 30.0;
             double target_y = s(target_x);
             double target_dist = sqrt((target_x)*(target_x) + (target_y)*(target_y));
-            
+
             double x_add_on = 0;
             // Set the ref velocity to the cars current speed and inc and dec from there
             // Fill in the points for the spline
@@ -363,7 +369,7 @@ int main() {
                 {
                     ref_vel -= 0.4; // Not the full deacceleration but close
                 }
-                else if (ref_vel > target_vel) 
+                else if (ref_vel > target_vel)
                 {
                     // Can slow down slower if dotn need to avoid
                     ref_vel -= 0.112;
@@ -376,40 +382,40 @@ int main() {
                 double N = (target_dist/(0.02*ref_vel/2.24));
                 double x_point = x_add_on + (target_x)/N;
                 double y_point = s(x_point);
-                
+
                 // Save the start point for the next loop
                 x_add_on = x_point;
-                
+
                 double x_ref = x_point;
                 double y_ref = y_point;
-                
+
                 // rotate back to the normal coordinates
                 x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
                 y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
-                
+
                 x_point += ref_x;
                 y_point += ref_y;
-                
+
                 next_x_vals.push_back(x_point);
                 next_y_vals.push_back(y_point);
             }
 
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-            
+
             // double dist_inc = 0.3;
             // for(int i = 0; i < 50; i++)
             // {
             //     double next_s = car_s + (i+1)*dist_inc;
             //     double next_d = 6;
-            //     
+            //
             //     vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
             //     next_x_vals.push_back(xy[0]);
             //     next_y_vals.push_back(xy[1]);
             // }
-            
-            
-            
+
+
+
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
             */
@@ -418,7 +424,7 @@ int main() {
 
           	//this_thread::sleep_for(chrono::milliseconds(1000));
           	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          
+
         }
       } else {
         // Manual driving

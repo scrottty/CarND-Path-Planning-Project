@@ -776,6 +776,16 @@ lapacke_mangling.h
 vector
 -
 
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/costFunctions.h
+vector
+-
+iostream
+-
+providedFunctions.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/providedFunctions.h
+constants.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
+
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/helperFunctions.h
 vector
 -
@@ -791,6 +801,8 @@ constants.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
 spline.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
+costFunctions.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/costFunctions.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/json.hpp
 algorithm
@@ -883,6 +895,8 @@ math.h
 -
 vector
 -
+constants.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
 cstdio

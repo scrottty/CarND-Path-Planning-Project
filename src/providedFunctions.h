@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <vector>
+#include "constants.h"
 
 using namespace std;
 
@@ -133,6 +134,16 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	frenet_s += distance(0,0,proj_x,proj_y);
 
 	return {frenet_s,frenet_d};
+}
+
+int GetLane(double d)
+{
+    if (d < LEFT_LANE_MAX)
+        return 0;
+    else if (d > RIGHT_LANE_MIN)
+        return 2;
+    else
+        return 1;
 }
 
 
