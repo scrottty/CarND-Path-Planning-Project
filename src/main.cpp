@@ -88,16 +88,23 @@ int main() {
   int current_lane = 1;
   int new_lane = 1;
   int old_lane = 1;
+  int prev_desired_lane = 1;
 
   // Get close to the speed limit
   double ref_vel = 0.0;
   double target_vel = MAX_VELOCITY;
 
+  // Bean counter to sum up the lane choice for lane change confirmation
+  int bean_count = 0;
+
+  bool lane_changed_initialised = false;
+
   // Keep driving comfortable
   double max_acc = 8;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,
-      &ref_vel, &target_vel, &current_lane, &new_lane, &old_lane, &ego_state, &max_acc]
+      &ref_vel, &target_vel, &current_lane, &new_lane, &old_lane, &prev_desired_lane, &ego_state, &max_acc,
+      &bean_count, & lane_changed_initialised]
       (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -150,7 +157,6 @@ int main() {
                 car_s = end_path_s;
                 car_values[2] = end_path_s;
             }
-            cout << prev_size << endl;
 
             // Split vehicles by lane
             vector<vector<vector<double>>> lane_vehicles;
@@ -169,9 +175,16 @@ int main() {
 
             // Check for potential collision
             bool avoid_vehicle = CheckFrontCollision(lane_vehicles[current_lane], car_s, prev_size, target_vel);
-            // Run the collision detection on the old lane as well to make sure we dont clip the car in front
+            // Run the collision detection on the new lane as well to make sure we dont clip the car in front
+
             if (ego_state == lane_change)
-                avoid_vehicle = avoid_vehicle || CheckFrontCollision(lane_vehicles[old_lane], car_s, prev_size, target_vel);
+                avoid_vehicle = avoid_vehicle || CheckFrontCollision(lane_vehicles[new_lane], car_s, prev_size, target_vel);
+
+            // Lanes vector. Here because it will be adjusted when changing lanes
+            vector<int> lanes;
+            lanes.push_back(current_lane);
+            lanes.push_back(current_lane);
+            lanes.push_back(current_lane);
 
             // cout << "Vehicle State: " << ego_state << endl;
             // BEHAVIOUR PLANNING
@@ -192,6 +205,8 @@ int main() {
                     // // maybe move back to the middle when empty
                     new_lane = ChooseLane(relevant_vehicles, target_vel, ref_vel, current_lane, previous_path_x, previous_path_y, car_values,
                                         map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                    new_lane = ConfirmLaneChange(new_lane, current_lane, prev_desired_lane, bean_count);
+
                     if (new_lane != current_lane)
                         ego_state = prepare_lane_change;
 
@@ -213,12 +228,38 @@ int main() {
                 }
                 case lane_change:
                 {
-                    old_lane = current_lane;
-                    current_lane = new_lane;
-                    int new_middle = 2+4*new_lane;
-                    // only move back to the keep_lane state when we are in the mdiddle of the new lane
+                    // Move to the middle lane first if a double lane change
+                    int new_middle;
+                    if ( abs(current_lane-new_lane) > 1)
+                    {
+                        lanes[0] = current_lane + (new_lane-current_lane)/2;
+                        new_middle = 2+4*(current_lane+ (new_lane-current_lane)/2);
+                    }
+                    else
+                    {
+                        lanes[0]= new_lane;
+                        new_middle = 2+4*new_lane;
+                    }
+                    lanes[1] = new_lane;
+                    lanes[2] = new_lane;
+                    // Update the lane
                     if (car_d>new_middle-1.5 && car_d<new_middle+1.5)
+                        current_lane = GetLane(car_d);
+
+                    if (current_lane == new_lane)
+                    {
+                        current_lane = new_lane;
                         ego_state = keep_lane;
+                    }
+
+
+
+                    // old_lane = current_lane;
+                    // current_lane = new_lane;
+                    // int new_middle = 2+4*new_lane;
+                    // only move back to the keep_lane state when we are in the mdiddle of the new lane
+                    // if (car_d>new_middle-1.5 && car_d<new_middle+1.5)
+                    //     ego_state = keep_lane;
 
                     break;
                 }
@@ -233,10 +274,6 @@ int main() {
                 default:
                     break;
             }
-            vector<int> lanes;
-            lanes.push_back(current_lane);
-            lanes.push_back(current_lane);
-            lanes.push_back(current_lane);
             vector<vector<double>> next_xy = CreateTrajectory(lanes,
                 target_vel, ref_vel, 50, avoid_vehicle, previous_path_x, previous_path_y,
                 car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);

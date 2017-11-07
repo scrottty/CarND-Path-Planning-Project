@@ -16,6 +16,9 @@ const int BACK_MOST_DISTANCE_SAFETY         = -20;
 const int FRONT_MOST_DISTANCE_RELEVANT      = 100;
 const int BACK_MOST_DISTANCE_RELEVANT       = -20;
 const int MIN_GAP_SIZE                      = 5;
+const int LANE_CHANGE_BEAN_COUNT_UPPER      = 10;
+
+const double DOUBLE_LANE_CHANGE_ADJUST      = 0.8;
 
 // Costs
 const double COLLISION_COST                 = 100.0;
@@ -28,6 +31,11 @@ const double SPEED_FAST_COST                = 5.0;
 const double SPEED_DISTANCE_COST            = 5.0;
 const double NUM_CARS_COST                  = 1.0;
 const double LANE_SPEED_COST                = 2.0;
+
+const double LANE_VELOCITY_COST             = 1.0;
+const double LANE_DISTANCE_COST             = 1.0;
+const double LANE_NUM_VEHICLES_COST         = 1.0;
+const double LANE_CHANGE_COST               = 2.0;
 
 // Constants for cost functions
 const double COLLISION_MAX_COST_DISTANCE    = -20.0;

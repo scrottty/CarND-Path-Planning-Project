@@ -5,6 +5,7 @@
 #include <math.h>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 #include "providedFunctions.h"
 #include "constants.h"
 #include "spline.h"
@@ -121,6 +122,7 @@ void FilterVehiclesForSafety( vector<vector<vector<double>>> lane_vehicles, vect
 void FilterForRelaventVehicles( vector<vector<vector<double>>> lane_vehicles, vector<vector<vector<double>>>& relevant_vehicles)
 {
     // Filter cars on the lanes by position to find only the relavent cars (safety)
+    // PERHAPS ESIMATE THEIR POSITIONS FORWARD TO ACCOUNT FOR THE FAST MOVING CARS
     vector<vector<double>> relavant_left_lane_vehicles;
     vector<vector<double>> relavant_middle_lane_vehicles;
     vector<vector<double>> relavant_right_lane_vehicles;
@@ -330,155 +332,221 @@ int ChooseLane( vector<vector<vector<double>>> relevant_vehicles, double& target
 {
     // Find which lane we want to be in 90m forward
     // It is chosen on the number of cars in the lane and speed of the lane
-    vector<int> num_cars;
-    for (int i=0; i<relevant_vehicles.size(); i++)
-        num_cars.push_back(relevant_vehicles[i].size());
 
-    // Calculate average speed of each lane
-    vector<double> max_lane_speed;
-    max_lane_speed.push_back(MAX_VELOCITY);
-    max_lane_speed.push_back(MAX_VELOCITY);
-    max_lane_speed.push_back(MAX_VELOCITY);
-    vector<double> current_lane_speed;
-    current_lane_speed.push_back(target_vel);
-    current_lane_speed.push_back(target_vel);
-    current_lane_speed.push_back(target_vel);
-    vector<double> slow_lane_speed;
-    slow_lane_speed.push_back(target_vel-2);
-    slow_lane_speed.push_back(target_vel-2);
-    slow_lane_speed.push_back(target_vel-2);
-    vector<double> mean_lane_speed;
-    mean_lane_speed.push_back(MAX_VELOCITY);
-    mean_lane_speed.push_back(MAX_VELOCITY);
-    mean_lane_speed.push_back(MAX_VELOCITY);
-    vector<double> closest_vehicle_speed;
-    closest_vehicle_speed.push_back(MAX_VELOCITY);
-    closest_vehicle_speed.push_back(MAX_VELOCITY);
-    closest_vehicle_speed.push_back(MAX_VELOCITY);
-    for (int i=0; i<3; i++)
+    // For each lane calculate the following
+    // Number of cars in the lane
+    // Distance to the closest car in front
+    // Velocity of the closest car
+    vector<int> num_cars;
+    double total_num_cars = 0;
+    // Preset the distance to the max in case there are no vehicles
+    vector<double> distance_to_vehicles;
+    distance_to_vehicles.push_back(FRONT_MOST_DISTANCE_RELEVANT);
+    distance_to_vehicles.push_back(FRONT_MOST_DISTANCE_RELEVANT);
+    distance_to_vehicles.push_back(FRONT_MOST_DISTANCE_RELEVANT);
+
+    // Preset the speed to max in case of no cars
+    vector<double> speed_of_vehicles;
+    speed_of_vehicles.push_back(MAX_VELOCITY);
+    speed_of_vehicles.push_back(MAX_VELOCITY);
+    speed_of_vehicles.push_back(MAX_VELOCITY);
+
+    for (int i=0; i<relevant_vehicles.size(); i++)
     {
-        double mean_speed = 0.0;
-        double closest_speed = 0.0;
-        double smallest_distance = 99999.0;
+        num_cars.push_back(relevant_vehicles[i].size());
+        total_num_cars += relevant_vehicles[i].size();
+
+        // Loop through the cars in the lane
+        double minimum_distance = 99999999.0;
         for (int j=0; j<relevant_vehicles[i].size(); j++)
         {
-            mean_speed += relevant_vehicles[i][j][8];
-            if (relevant_vehicles[i][j][7] < smallest_distance)
+            if (relevant_vehicles[i][j][7] < minimum_distance)
             {
-                smallest_distance = relevant_vehicles[i][j][7];
-                closest_speed = relevant_vehicles[i][j][8];
-            }
-        }
-        if (mean_speed != 0) // If there where no vehicles
-            mean_lane_speed[i] = (mean_speed/relevant_vehicles[i].size());
-        if (closest_speed != 0)
-            closest_vehicle_speed[i] = closest_speed;
-    }
-    int goal_lane = ChooseGoalLane(num_cars, mean_lane_speed, current_lane);
-    // Generate possible paths
-    // Step through the different lane options and speeds to produce the various options
-    vector<int> possible_lanes;
-    possible_lanes.push_back(0);
-    possible_lanes.push_back(1);
-    possible_lanes.push_back(2);
-    vector<vector<double>> speeds;
-    speeds.push_back(max_lane_speed);
-    // speeds.push_back(current_lane_speed);
-    speeds.push_back(mean_lane_speed);
-    speeds.push_back(closest_vehicle_speed);
-    // speeds.push_back(slow_lane_speed);
-    vector<vector<vector<double>>> potential_trajectories;
-    vector<vector<int>> lanes_stored;
-    vector<double> choosen_speed;
-    for (int i=0; i<possible_lanes.size(); i++) // Lane option for the 30m point
-    {
-        for (int j=0; j<possible_lanes.size(); j++) // Lane option for the 60m point
-        {
-            for (int k=0; k<possible_lanes.size(); k++) // Lane option for the 90m point
-            {
-                for (int m=0; m<speeds.size(); m++) // different speed options
-                {
-                    // Miss the trajectories that will cause the vehicle to do a double lane change
-                    if (possible_lanes[i] > current_lane+1 || possible_lanes[i] < current_lane-1)
-                        continue;
-
-                    vector<int> lanes;
-                    lanes.push_back(possible_lanes[i]);
-                    lanes.push_back(possible_lanes[j]);
-                    lanes.push_back(possible_lanes[k]);
-                    // lanes.push_back(possible_lanes[i]);
-                    // lanes.push_back(possible_lanes[j]);
-                    // lanes.push_back(possible_lanes[k]);
-                    double ref_vel_temp = ref_vel; // Need to reset the value of ref vel to what it is now
-                    // The selected speed is for the lane of the 30m mark
-                    vector<vector<double>> xy = CreateTrajectory(lanes, speeds[m][possible_lanes[i]], ref_vel_temp, 50, false,
-                        previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                    potential_trajectories.push_back(xy);
-                    lanes_stored.push_back(lanes); // Store this for later
-                    choosen_speed.push_back(speeds[m][possible_lanes[i]]);
-                }
+                minimum_distance = relevant_vehicles[i][j][7];
+                distance_to_vehicles[i] = relevant_vehicles[i][j][7];
+                speed_of_vehicles[i] = relevant_vehicles[i][j][8];
             }
         }
     }
 
-    // cout << " Actual S: " << car_values[2] << endl;
-
-    // Go through each trajectory and calc the cost
-    vector<vector<double>> all_costs;
-    vector<double> all_total_costs;
-    for (int i=0; i<potential_trajectories.size(); i++)
+    double cost = 9999999999;
+    int choosen_lane = current_lane;
+    // Loop through each lane and calc the cost
+    for (int i=0; i<3; i++)
     {
-        double total_cost = 0;
-        double avoid_cost = AvoidCollision(potential_trajectories[i],relevant_vehicles, map_waypoints_x, map_waypoints_y) * COLLISION_COST;
-        double Buffer_cost = DistanceBuffer(potential_trajectories[i],relevant_vehicles, map_waypoints_x, map_waypoints_y) * BUFFER_COST;
-        double DesiredLane_cost = DesiredLane(lanes_stored[i] ,goal_lane) * DESIRED_LANE_COST;
-        double CurrentLane_cost = CurrentLane(lanes_stored[i], current_lane) * CURRENT_LANE_COST;
-        double SpeedTraffic_cost = SpeedTraffic(potential_trajectories[i],mean_lane_speed, map_waypoints_x, map_waypoints_y) * SPEED_TRAFFIC_COST;
-        double SpeedLimit_cost = 0;//SpeedLimit(potential_trajectories[i]) * SPEED_LIMIT_COST;
-        double SpeedFast_cost = SpeedFast(potential_trajectories[i]) * SPEED_FAST_COST;
-        double SpeedDistance_cost = SpeedDistance(potential_trajectories[i], relevant_vehicles, map_waypoints_x, map_waypoints_y) * SPEED_DISTANCE_COST;
+        double new_cost = 0.0;
+        new_cost += LaneVelocityCost(speed_of_vehicles[i]) * LANE_VELOCITY_COST;
+        new_cost += LaneDistanceCost(distance_to_vehicles[i]) * LANE_DISTANCE_COST;
+        new_cost += LaneNumVehiclesCost(num_cars[i], total_num_cars) * LANE_NUM_VEHICLES_COST;
+        new_cost += LaneChangeCost(i, current_lane) * LANE_CHANGE_COST;
 
-        vector<double> cost;
-        cost.push_back(avoid_cost);
-        cost.push_back(Buffer_cost);
-        cost.push_back(DesiredLane_cost);
-        cost.push_back(CurrentLane_cost);
-        cost.push_back(SpeedTraffic_cost);
-        cost.push_back(SpeedLimit_cost);
-        cost.push_back(SpeedFast_cost);
-        cost.push_back(SpeedDistance_cost);
-        all_costs.push_back(cost);
-        total_cost = avoid_cost + Buffer_cost + DesiredLane_cost + CurrentLane_cost + SpeedTraffic_cost + SpeedLimit_cost + SpeedFast_cost + SpeedDistance_cost;
-        all_total_costs.push_back(total_cost);
-    }
+        cout << "Lane: " << i << " | Vel: " << speed_of_vehicles[i] << " cost: " << LaneVelocityCost(speed_of_vehicles[i]) * LANE_VELOCITY_COST <<
+                                " | Dist: " << distance_to_vehicles[i] << " cost: " << LaneDistanceCost(distance_to_vehicles[i]) * LANE_DISTANCE_COST <<
+                                " | Num: " << num_cars[i] << " cost: " << LaneNumVehiclesCost(num_cars[i], total_num_cars) * LANE_NUM_VEHICLES_COST <<
+                                " | LC: " << abs(current_lane-i) << " cost: " << LaneChangeCost(i, current_lane) * LANE_CHANGE_COST <<
+                                " | Total: " << new_cost << endl;
 
-    // Find the minimum cost and the trajectory
-    double minimum_cost = 99999999;
-    int minimum_idx = 99999999;
-    for (int i=0; i<all_costs.size(); i++)
-    {
-        if (all_total_costs[i] < minimum_cost)
+        if (new_cost < cost)
         {
-            minimum_cost = all_total_costs[i];
-            minimum_idx = i;
+            cost = new_cost;
+            choosen_lane = i;
         }
+
     }
 
-    for (int i=0; i<potential_trajectories.size(); i++)
-    {
-        // cout << "Trajectory: [" << lanes_stored[i][0] << ","
-        //         << lanes_stored[i][1] << "," << lanes_stored[i][2]
-        //         << "] | Speed: " << choosen_speed[i] << " | Cost: " << all_total_costs[i] << "| Costs: [" << all_costs[i][0] << ","
-        //             << all_costs[i][1] << "," << all_costs[i][2] << "," << all_costs[i][3] << "," << all_costs[i][4]
-        //             << "," << all_costs[i][5] << "," << all_costs[i][6] << "," << all_costs[i][7] << "]"<< endl;
-    }
+    cout << "Goal - Lane: " << choosen_lane << " | num_cars: " << num_cars[choosen_lane] << " | Speed: " << speed_of_vehicles[choosen_lane] <<
+            " | Distance: " << distance_to_vehicles[choosen_lane] << " | Lane Change: " << abs(current_lane-choosen_lane) << endl;
 
-    cout << "Choosen Trajectory: [" << lanes_stored[minimum_idx][0] << ","
-            << lanes_stored[minimum_idx][1] << "," << lanes_stored[minimum_idx][2]
-            << "] | Speed: " << choosen_speed[minimum_idx] << " | Cost: " << minimum_cost << endl;
+    return choosen_lane;
 
-    target_vel = choosen_speed[minimum_idx];
-    return lanes_stored[minimum_idx][0];
+
+
+    //
+    // // Calculate average speed of each lane
+    // vector<double> max_lane_speed;
+    // max_lane_speed.push_back(MAX_VELOCITY);
+    // max_lane_speed.push_back(MAX_VELOCITY);
+    // max_lane_speed.push_back(MAX_VELOCITY);
+    // vector<double> current_lane_speed;
+    // current_lane_speed.push_back(target_vel);
+    // current_lane_speed.push_back(target_vel);
+    // current_lane_speed.push_back(target_vel);
+    // vector<double> slow_lane_speed;
+    // slow_lane_speed.push_back(target_vel-2);
+    // slow_lane_speed.push_back(target_vel-2);
+    // slow_lane_speed.push_back(target_vel-2);
+    // vector<double> mean_lane_speed;
+    // mean_lane_speed.push_back(MAX_VELOCITY);
+    // mean_lane_speed.push_back(MAX_VELOCITY);
+    // mean_lane_speed.push_back(MAX_VELOCITY);
+    // vector<double> closest_vehicle_speed;
+    // closest_vehicle_speed.push_back(MAX_VELOCITY);
+    // closest_vehicle_speed.push_back(MAX_VELOCITY);
+    // closest_vehicle_speed.push_back(MAX_VELOCITY);
+    // for (int i=0; i<3; i++)
+    // {
+    //     double mean_speed = 0.0;
+    //     double closest_speed = 0.0;
+    //     double smallest_distance = 99999.0;
+    //     for (int j=0; j<relevant_vehicles[i].size(); j++)
+    //     {
+    //         mean_speed += relevant_vehicles[i][j][8];
+    //         if (relevant_vehicles[i][j][7] < smallest_distance)
+    //         {
+    //             smallest_distance = relevant_vehicles[i][j][7];
+    //             closest_speed = relevant_vehicles[i][j][8];
+    //         }
+    //     }
+    //     if (mean_speed != 0) // If there where no vehicles
+    //         mean_lane_speed[i] = (mean_speed/relevant_vehicles[i].size());
+    //     if (closest_speed != 0)
+    //         closest_vehicle_speed[i] = closest_speed;
+    // }
+    // int goal_lane = ChooseGoalLane(num_cars, mean_lane_speed, current_lane);
+    // // Generate possible paths
+    // // Step through the different lane options and speeds to produce the various options
+    // vector<int> possible_lanes;
+    // possible_lanes.push_back(0);
+    // possible_lanes.push_back(1);
+    // possible_lanes.push_back(2);
+    // vector<vector<double>> speeds;
+    // speeds.push_back(max_lane_speed);
+    // // speeds.push_back(current_lane_speed);
+    // speeds.push_back(mean_lane_speed);
+    // speeds.push_back(closest_vehicle_speed);
+    // // speeds.push_back(slow_lane_speed);
+    // vector<vector<vector<double>>> potential_trajectories;
+    // vector<vector<int>> lanes_stored;
+    // vector<double> choosen_speed;
+    // for (int i=0; i<possible_lanes.size(); i++) // Lane option for the 30m point
+    // {
+    //     for (int j=0; j<possible_lanes.size(); j++) // Lane option for the 60m point
+    //     {
+    //         for (int k=0; k<possible_lanes.size(); k++) // Lane option for the 90m point
+    //         {
+    //             for (int m=0; m<speeds.size(); m++) // different speed options
+    //             {
+    //                 // Miss the trajectories that will cause the vehicle to do a double lane change
+    //                 if (possible_lanes[i] > current_lane+1 || possible_lanes[i] < current_lane-1)
+    //                     continue;
+    //
+    //                 vector<int> lanes;
+    //                 lanes.push_back(possible_lanes[i]);
+    //                 lanes.push_back(possible_lanes[j]);
+    //                 lanes.push_back(possible_lanes[k]);
+    //                 // lanes.push_back(possible_lanes[i]);
+    //                 // lanes.push_back(possible_lanes[j]);
+    //                 // lanes.push_back(possible_lanes[k]);
+    //                 double ref_vel_temp = ref_vel; // Need to reset the value of ref vel to what it is now
+    //                 // The selected speed is for the lane of the 30m mark
+    //                 vector<vector<double>> xy = CreateTrajectory(lanes, speeds[m][possible_lanes[i]], ref_vel_temp, 50, false,
+    //                     previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    //                 potential_trajectories.push_back(xy);
+    //                 lanes_stored.push_back(lanes); // Store this for later
+    //                 choosen_speed.push_back(speeds[m][possible_lanes[i]]);
+    //             }
+    //         }
+    //     }
+    // }
+    //
+    // // cout << " Actual S: " << car_values[2] << endl;
+    //
+    // // Go through each trajectory and calc the cost
+    // vector<vector<double>> all_costs;
+    // vector<double> all_total_costs;
+    // for (int i=0; i<potential_trajectories.size(); i++)
+    // {
+    //     double total_cost = 0;
+    //     double avoid_cost = AvoidCollision(potential_trajectories[i],relevant_vehicles, map_waypoints_x, map_waypoints_y) * COLLISION_COST;
+    //     double Buffer_cost = DistanceBuffer(potential_trajectories[i],relevant_vehicles, map_waypoints_x, map_waypoints_y) * BUFFER_COST;
+    //     double DesiredLane_cost = DesiredLane(lanes_stored[i] ,goal_lane) * DESIRED_LANE_COST;
+    //     double CurrentLane_cost = CurrentLane(lanes_stored[i], current_lane) * CURRENT_LANE_COST;
+    //     double SpeedTraffic_cost = SpeedTraffic(potential_trajectories[i],mean_lane_speed, map_waypoints_x, map_waypoints_y) * SPEED_TRAFFIC_COST;
+    //     double SpeedLimit_cost = 0;//SpeedLimit(potential_trajectories[i]) * SPEED_LIMIT_COST;
+    //     double SpeedFast_cost = SpeedFast(potential_trajectories[i]) * SPEED_FAST_COST;
+    //     double SpeedDistance_cost = SpeedDistance(potential_trajectories[i], relevant_vehicles, map_waypoints_x, map_waypoints_y) * SPEED_DISTANCE_COST;
+    //
+    //     vector<double> cost;
+    //     cost.push_back(avoid_cost);
+    //     cost.push_back(Buffer_cost);
+    //     cost.push_back(DesiredLane_cost);
+    //     cost.push_back(CurrentLane_cost);
+    //     cost.push_back(SpeedTraffic_cost);
+    //     cost.push_back(SpeedLimit_cost);
+    //     cost.push_back(SpeedFast_cost);
+    //     cost.push_back(SpeedDistance_cost);
+    //     all_costs.push_back(cost);
+    //     total_cost = avoid_cost + Buffer_cost + DesiredLane_cost + CurrentLane_cost + SpeedTraffic_cost + SpeedLimit_cost + SpeedFast_cost + SpeedDistance_cost;
+    //     all_total_costs.push_back(total_cost);
+    // }
+    //
+    // // Find the minimum cost and the trajectory
+    // double minimum_cost = 99999999;
+    // int minimum_idx = 99999999;
+    // for (int i=0; i<all_costs.size(); i++)
+    // {
+    //     if (all_total_costs[i] < minimum_cost)
+    //     {
+    //         minimum_cost = all_total_costs[i];
+    //         minimum_idx = i;
+    //     }
+    // }
+    //
+    // for (int i=0; i<potential_trajectories.size(); i++)
+    // {
+    //     // cout << "Trajectory: [" << lanes_stored[i][0] << ","
+    //     //         << lanes_stored[i][1] << "," << lanes_stored[i][2]
+    //     //         << "] | Speed: " << choosen_speed[i] << " | Cost: " << all_total_costs[i] << "| Costs: [" << all_costs[i][0] << ","
+    //     //             << all_costs[i][1] << "," << all_costs[i][2] << "," << all_costs[i][3] << "," << all_costs[i][4]
+    //     //             << "," << all_costs[i][5] << "," << all_costs[i][6] << "," << all_costs[i][7] << "]"<< endl;
+    // }
+    //
+    // cout << "Choosen Trajectory: [" << lanes_stored[minimum_idx][0] << ","
+    //         << lanes_stored[minimum_idx][1] << "," << lanes_stored[minimum_idx][2]
+    //         << "] | Speed: " << choosen_speed[minimum_idx] << " | Cost: " << minimum_cost << endl;
+    //
+    // target_vel = choosen_speed[minimum_idx];
+    // return lanes_stored[minimum_idx][0];
 
 
     // DO I JUST RETURN THE POINTS OR RECALCULATE WITH THE SAFETY STUFF INCLUDED????
@@ -562,6 +630,28 @@ int ChooseLane( vector<vector<vector<double>>> relevant_vehicles, double& target
     // }
 
     return false;*/
+}
+
+// Will return the lane to change
+int ConfirmLaneChange(int new_lane, int current_lane, int& prev_desired_lane, int& bean_count)
+{
+    // increment the bean count if the new lane is the same as previously requested
+    if (new_lane == prev_desired_lane)
+        bean_count++;
+    else // else reset the bean_count
+        bean_count = 0;
+
+    // Reset the prev desired lane to the new lane for next round
+    prev_desired_lane = new_lane;
+
+    // If the bean count has accumulate enough return the new_lane, reset the bean_count
+    if (bean_count > LANE_CHANGE_BEAN_COUNT_UPPER)
+    {
+        bean_count = 0;
+        return new_lane;
+    }
+    else // else return the current lane until the other has enough
+        return  current_lane;
 }
 
 bool CheckLaneIsSafe(vector<vector<double>> vehicles_in_new_lane)
