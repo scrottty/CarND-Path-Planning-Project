@@ -150,6 +150,7 @@ int main() {
                 car_s = end_path_s;
                 car_values[2] = end_path_s;
             }
+            cout << prev_size << endl;
 
             // Split vehicles by lane
             vector<vector<vector<double>>> lane_vehicles;

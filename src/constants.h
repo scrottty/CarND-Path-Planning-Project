@@ -24,15 +24,16 @@ const double DESIRED_LANE_COST              = 10.0;
 const double CURRENT_LANE_COST              = 5.0;
 const double SPEED_TRAFFIC_COST             = 1.0;
 const double SPEED_LIMIT_COST               = 100.0;
-const double SPEED_FAST_COST                = 1.0;
+const double SPEED_FAST_COST                = 5.0;
+const double SPEED_DISTANCE_COST            = 5.0;
 const double NUM_CARS_COST                  = 1.0;
 const double LANE_SPEED_COST                = 2.0;
 
 // Constants for cost functions
-const double COLLISION_MAX_COST_DISTANCE    = 5.0;
-const double COLLISION_MIN_COST_DISTANCE    = 15.0;
-const double BUFFER_MAX_COST_DISTANCE       = 10.0;
-const double BUFFER_MIN_COST_DISTANCE       = 30.0;
+const double COLLISION_MAX_COST_DISTANCE    = -20.0;
+const double COLLISION_MIN_COST_DISTANCE    = 5.0;
+const double BUFFER_MAX_COST_DISTANCE       = 5.0;
+const double BUFFER_MIN_COST_DISTANCE       = 15.0;
 const double SPEED_LIMIT_UPPER              = 50.0;
 
 #endif //__CONSTANTS_H__

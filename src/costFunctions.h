@@ -229,5 +229,59 @@ double SpeedFast(vector<vector<double>> trajectory)
     return cost;
 }
 
+double SpeedDistance(vector<vector<double>> trajectory, vector<vector<vector<double>>> relevant_vehicles,
+                        const vector<double>& map_waypoints_x, const vector<double>& map_waypoints_y)
+{
+    // Cost will be the max
+    double cost = 0.0;
+    // Step through the trajectory
+    for (int i=1; i<trajectory[0].size(); i++)
+    {
+        double x_position = trajectory[0][i];
+        double y_position = trajectory[1][i];
+
+        double x_position_prev = trajectory[0][i-1];
+        double y_position_prev = trajectory[1][i-1];
+
+        double theta = atan2(y_position-y_position_prev , x_position-x_position_prev);
+
+        // Get Frenet, if in same lane, check how close
+        vector<double> frenet = getFrenet(x_position, y_position, theta, map_waypoints_x, map_waypoints_y);
+        double lane = GetLane(frenet[1]);
+
+        // Loop through the other vehicles in the same lane, get the smallest relative distance
+        double smallest_relative_distance = 9999999999.0;
+        for (int j=0; j<relevant_vehicles[lane].size(); j++)
+        {
+            // CAN USE THIS TO CALC THEIR POSITION IN THE FUTURE
+            double vx = relevant_vehicles[lane][j][3];
+            double vy = relevant_vehicles[lane][j][4];
+            double check_speed = sqrt(vx*vx+vy*vy);
+            double check_car_s = relevant_vehicles[lane][j][5];
+
+            check_car_s += ((double)i*0.02*check_speed);
+
+            double relative_distance = check_car_s - frenet[0];
+            if (relative_distance < smallest_relative_distance)
+                smallest_relative_distance = relative_distance;
+        }
+
+        double x = x_position - x_position_prev;
+        double y = y_position - y_position_prev;
+        double distance = sqrt(x*x+y*y);
+        double speed = distance/0.02 * 2.24;
+
+
+        double new_cost = 1/(1+exp(-1*((speed/smallest_relative_distance)-5)));
+        // cout << "Speed Dist Ratio: " << (speed/smallest_relative_distance) << endl;
+        if (new_cost > 1.0)
+            new_cost = 1.0;
+
+        if (new_cost > cost)
+            cost = new_cost;
+    }
+    return cost;
+}
+
 
 #endif //__COSTFUNCTIONS_H__
