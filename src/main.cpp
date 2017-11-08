@@ -207,6 +207,9 @@ int main() {
                                         map_waypoints_s, map_waypoints_x, map_waypoints_y);
                     new_lane = ConfirmLaneChange(new_lane, current_lane, prev_desired_lane, bean_count);
 
+                    target_vel = ChooseSpeed(relevant_vehicles, ref_vel, new_lane, current_lane,
+                        previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
                     if (new_lane != current_lane)
                         ego_state = prepare_lane_change;
 
@@ -230,10 +233,15 @@ int main() {
                 {
                     // Move to the middle lane first if a double lane change
                     int new_middle;
+                    // This is to help smoothen the double lane transistion
+                    // The tolerance for the transition lane is larger so we think we
+                    // are in it sooner
+                    double lane_middle_tol = 1.5;
                     if ( abs(current_lane-new_lane) > 1)
                     {
                         lanes[0] = current_lane + (new_lane-current_lane)/2;
                         new_middle = 2+4*(current_lane+ (new_lane-current_lane)/2);
+                        lane_middle_tol = 1.7;
                     }
                     else
                     {
@@ -243,7 +251,7 @@ int main() {
                     lanes[1] = new_lane;
                     lanes[2] = new_lane;
                     // Update the lane
-                    if (car_d>new_middle-1.5 && car_d<new_middle+1.5)
+                    if (car_d>new_middle-lane_middle_tol && car_d<new_middle+lane_middle_tol)
                         current_lane = GetLane(car_d);
 
                     if (current_lane == new_lane)
