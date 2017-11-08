@@ -21,7 +21,7 @@ const int LANE_CHANGE_BEAN_COUNT_UPPER      = 10;
 const double DOUBLE_LANE_CHANGE_ADJUST      = 0.8;
 
 // Costs
-const double COLLISION_COST                 = 5.0;
+const double COLLISION_COST                 = 10.0;
 const double MAX_VELOCITY_COST              = 1.0;
 // const double BUFFER_COST                    = 2.0;
 // const double DESIRED_LANE_COST              = 10.0;

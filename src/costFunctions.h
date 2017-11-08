@@ -38,11 +38,11 @@ double CollisionCost(const vector<vector<double>>& trajectory, const vector<vect
                         const vector<double>& map_waypoints_x, const vector<double>& map_waypoints_y, double& minimum_distance)
 {
     // Get the position at the end of the trajectory and see where itll be relative to the other vehicles
-    double x_position = trajectory[0][trajectory.size()];
-    double y_position = trajectory[1][trajectory.size()];
+    double x_position = trajectory[0][trajectory[0].size()-1];
+    double y_position = trajectory[1][trajectory[1].size()-1];
 
-    double x_position_prev = trajectory[0][trajectory.size()-1];
-    double y_position_prev = trajectory[1][trajectory.size()-1];
+    double x_position_prev = trajectory[0][trajectory[0].size()-2];
+    double y_position_prev = trajectory[1][trajectory[1].size()-2];
 
     double theta = atan2(y_position-y_position_prev , x_position-x_position_prev);
 

@@ -151,7 +151,6 @@ vector<vector<double>> CreateTrajectory(vector<int> lanes, double target_vel, do
     double steps_forwards, bool avoid_vehicle, const vector<double>& previous_path_x, const vector<double>& previous_path_y,
     const vector<double>& car_values, const vector<double>& map_waypoints_s, const vector<double>& map_waypoints_x, const vector<double>& map_waypoints_y)
 {
-    cout << lanes[0] << "," << lanes[1] << "," << lanes[2] << "," << target_vel << "," << ref_vel << "," << steps_forwards << "," << endl;
     double car_x = car_values[0];
     double car_y = car_values[1];
     double car_s = car_values[2];
@@ -261,6 +260,7 @@ vector<vector<double>> CreateTrajectory(vector<int> lanes, double target_vel, do
         {
             ref_vel += 0.224;
         }
+
         // Calc the size of the step
         double N = (target_dist/(0.02*ref_vel/2.24));
         double x_point = x_add_on + (target_x)/N;
@@ -282,7 +282,6 @@ vector<vector<double>> CreateTrajectory(vector<int> lanes, double target_vel, do
         next_x_vals.push_back(x_point);
         next_y_vals.push_back(y_point);
     }
-    cout << ref_vel << endl;
 
     vector<vector<double>> xy;
     xy.push_back(next_x_vals);
@@ -702,7 +701,8 @@ double ChooseSpeed(vector<vector<vector<double>>> relevant_vehicles, double ref_
 
     // Add a safety speed
     speed_options.push_back(speed_of_vehicles[current_lane]-5);
-    speed_options.push_back(0.0);
+    // speed_options.push_back(0.0);
+    // speed_options.push_back(100.0);
 
     // Choose the lanes
     vector<int> lanes;
@@ -717,10 +717,8 @@ double ChooseSpeed(vector<vector<vector<double>>> relevant_vehicles, double ref_
     for (int i=0; i<speed_options.size(); i++)
     {
         double ref_vel_temp = ref_vel;
-        vector<vector<double>> xy = CreateTrajectory(lanes, speed_options[i], ref_vel_temp, 200, false,
+        vector<vector<double>> xy = CreateTrajectory(lanes, speed_options[i], ref_vel_temp, 100, false,
                             previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-
-        cout << xy[0].size() << "," << previous_path_x.size() << endl;
         potential_trajectories.push_back(xy);
     }
 
