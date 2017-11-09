@@ -661,6 +661,23 @@ double ChooseSpeed(vector<vector<vector<double>>> relevant_vehicles, double ref_
     const vector<double>& previous_path_x, const vector<double>& previous_path_y, const vector<double>& car_values,
     const vector<double>& map_waypoints_s, const vector<double>& map_waypoints_x, const vector<double>& map_waypoints_y)
 {
+    // Check what is the next lane, in case of moving two lanes
+    // int lane = new_lane;
+    // if (abs(new_lane - current_lane) > 1)
+    //     lane = current_lane + (new_lane-current_lane)/2;
+    //
+    // // Loop through the cars in the lane
+    // double minimum_distance = 99999999.0;
+    // for (int i=0; i<relevant_vehicles[lane].size(); i++)
+    // {
+    //     if (relevant_vehicles[lane][i][7] < minimum_distance)
+    //     {
+    //         minimum_distance = relevant_vehicles[lane][i][7];
+    //         speed_of_vehicles[lane] = relevant_vehicles[lane][i][8];
+    //     }
+    // }
+
+
     vector<double> speed_options;
     speed_options.push_back(MAX_VELOCITY);
     if (car_values[5] < MAX_VELOCITY-0.5) // Add current speed if sufficiently less
@@ -700,7 +717,7 @@ double ChooseSpeed(vector<vector<vector<double>>> relevant_vehicles, double ref_
     }
 
     // Add a safety speed
-    speed_options.push_back(speed_of_vehicles[current_lane]-5);
+    // speed_options.push_back(speed_of_vehicles[current_lane]-5);
     // speed_options.push_back(0.0);
     // speed_options.push_back(100.0);
 
@@ -728,13 +745,17 @@ double ChooseSpeed(vector<vector<vector<double>>> relevant_vehicles, double ref_
     for (int i=0; i<potential_trajectories.size(); i++)
     {
         double new_cost = 0.0;
-        double minimum_distance = COLLISION_MIN_COST_DISTANCE; //Done here for debugging
+        double minimum_distance = 50; //Done here for debugging
         double collision_cost = CollisionCost(potential_trajectories[i], relevant_vehicles, map_waypoints_x, map_waypoints_y, minimum_distance) * COLLISION_COST;
-        double max_velocity_cost = MaxVelocityCost(speed_options[i]);
-        new_cost = collision_cost + max_velocity_cost;
+        double max_velocity_cost = MaxVelocityCost(speed_options[i]) * MAX_VELOCITY_COST;
+        // double combo_cost = SpeedDistanceCombo(minimum_distance, speed_options[i]) * VEL_DIST_COMBO_COST;
+        // double lane_velocity_cost = MatchLaneVelocityCost(speed_options[i], speed_of_vehicles[new_lane]) * MATCH_LANE_VELOCTIY_COST;
+        new_cost = collision_cost + max_velocity_cost;// + lane_velocity_cost;
 
         cout << "Speed: " << speed_options[i] << " | Distance: " << minimum_distance << " cost: " << collision_cost <<
                  " | Velocity: " << (MAX_VELOCITY - speed_options[i]) << " cost " << max_velocity_cost <<
+                //  " | Ratio: " << (minimum_distance/30)/(speed_options[i]/MAX_VELOCITY) << " cost " << combo_cost <<
+                // " | Lane Velocity: " << (abs(speed_of_vehicles[current_lane] - speed_options[i])) << " cost " << lane_velocity_cost <<
                  " | Total: " << new_cost << endl;
 
         if (new_cost < cost)
@@ -743,6 +764,7 @@ double ChooseSpeed(vector<vector<vector<double>>> relevant_vehicles, double ref_
             choosen_trajectory = i;
         }
     }
+    cout << "Choosen Speed: " << speed_options[choosen_trajectory] << endl;
 
     return speed_options[choosen_trajectory];
 }

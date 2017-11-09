@@ -49,7 +49,6 @@ double CollisionCost(const vector<vector<double>>& trajectory, const vector<vect
     // Get Frenet, check how close to vehicles in the lane
     vector<double> frenet = getFrenet(x_position, y_position, theta, map_waypoints_x, map_waypoints_y);
     double car_s = frenet[0];
-    cout << "car_s: " << frenet[0] << " | " << x_position << " | " << y_position << endl;
     int lane = GetLane(frenet[1]);
 
     for  (int i=0; i<relevant_vehicles[lane].size(); i++)
@@ -60,24 +59,38 @@ double CollisionCost(const vector<vector<double>>& trajectory, const vector<vect
         double check_speed = sqrt(vx*vx+vy*vy);
         double check_car_s = relevant_vehicles[lane][i][5];
 
-        check_car_s += ((double)i*0.02*check_speed);
+        check_car_s += ((double)100*0.02*check_speed);
         double relative_distance = check_car_s - car_s;
         if (relative_distance < minimum_distance)
             minimum_distance = relative_distance;
     }
 
     // Calc cost
-    double cost = -(minimum_distance)/(COLLISION_MIN_COST_DISTANCE) + 1;
-    if (cost > 1)
-        cost = 1;
-    if (cost < 0)
-        cost = 0;
+    // double cost = -(minimum_distance)/(COLLISION_MIN_COST_DISTANCE) + 1;
+    // if (cost > 1)
+    //     cost = 1;
+    // if (cost < 0)
+    //     cost = 0;
+
+
+    double cost = 1/(1+exp((minimum_distance-10)/3));
     return cost;
 }
 
 double MaxVelocityCost(double velocity)
 {
     return 1/(1+exp(-2*((MAX_VELOCITY - velocity)-2)));
+}
+
+double MatchLaneVelocityCost(double velocity, double lane_velocity)
+{
+    return 1/(1+exp(-2*(abs(lane_velocity - velocity)-2)));
+}
+
+double SpeedDistanceCombo(const double& minimum_distance, const double& velocity)
+{
+    double ratio = (minimum_distance/30) / (velocity/MAX_VELOCITY);
+    return 1/(1+exp(5*(ratio-0.5)));
 }
 
 // double AvoidCollision(vector<vector<double>> trajectory, vector<vector<vector<double>>> relevant_vehicles,
