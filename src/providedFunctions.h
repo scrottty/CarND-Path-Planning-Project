@@ -49,12 +49,25 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
 
 	double heading = atan2( (map_y-y),(map_x-x) );
 
-	double angle = fabs(theta-heading);
+	double theta_pos = fmod(theta + (2*pi()),2*pi());
+    double heading_pos = fmod(heading + (2*pi()),2*pi());
+    double angle = fabs(theta_pos-heading_pos);
+    if (angle > pi()) {
+        angle = (2*pi()) - angle;
+    }
 
-	if(angle > pi()/4)
-	{
-		closestWaypoint++;
-	}
+	if(angle > pi()/2)
+    {
+        closestWaypoint = (closestWaypoint + 1) % maps_x.size();
+
+    }
+
+	// double angle = fabs(theta-heading);
+
+	// if(angle > pi()/2)
+	// {
+	// 	closestWaypoint++;
+	// }
 
 	return closestWaypoint;
 

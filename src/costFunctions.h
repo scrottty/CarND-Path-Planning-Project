@@ -21,12 +21,20 @@ double LaneVelocityDifferenceCost(double speed_of_vehicle, double speed_current_
 
 double LaneDistanceCost(double distance_to_vehicle)
 {
-    return 1/(1+exp(-0.05*((FRONT_MOST_DISTANCE_RELEVANT - distance_to_vehicle)-80)));
+    return 1/(1+exp(-0.1*((FRONT_MOST_DISTANCE_RELEVANT - distance_to_vehicle)-70)));
+    // return 1/(1+exp(-0.05*((FRONT_MOST_DISTANCE_RELEVANT - distance_to_vehicle)-80)));
 }
 
 double LaneNumVehiclesCost(double num_cars_in_lane, double total_num_cars)
 {
     return num_cars_in_lane/total_num_cars;
+}
+
+double LaneNumVehiclesCrossedCost(vector<int> num_close_cars, int new_lane, int current_lane)
+{
+    if (abs(new_lane-current_lane) > 1)
+        return (double)num_close_cars[1];
+    return 0;
 }
 
 double LaneChangeCost(int new_lane, int current_lane)
@@ -61,17 +69,12 @@ double CollisionCost(const vector<vector<double>>& trajectory, const vector<vect
 
         check_car_s += ((double)100*0.02*check_speed);
         double relative_distance = check_car_s - car_s;
+        // cout << "rel dist: " << relative_distance << "| Check_car_s: " << check_car_s << " | check_speed: " << check_speed << " | car_s: " << car_s << endl;
+        // cout << "vx: " << vx << " | vy: " << vy << " | x_pos: " << x_position << " | x_pos_prev: " << x_position_prev <<
+        //         " | y_pos: " << y_position << " | y_pos_prev: " << y_position_prev << " | theta: " << theta << " | lane" << lane << endl;
         if (relative_distance < minimum_distance)
             minimum_distance = relative_distance;
     }
-
-    // Calc cost
-    // double cost = -(minimum_distance)/(COLLISION_MIN_COST_DISTANCE) + 1;
-    // if (cost > 1)
-    //     cost = 1;
-    // if (cost < 0)
-    //     cost = 0;
-
 
     double cost = 1/(1+exp((minimum_distance-10)/3));
     return cost;
@@ -79,7 +82,7 @@ double CollisionCost(const vector<vector<double>>& trajectory, const vector<vect
 
 double MaxVelocityCost(double velocity)
 {
-    return 1/(1+exp(-2*((MAX_VELOCITY - velocity)-2)));
+    return 1/(1+exp(-0.5*((MAX_VELOCITY - velocity)-10)));
 }
 
 double MatchLaneVelocityCost(double velocity, double lane_velocity)

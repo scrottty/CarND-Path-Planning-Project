@@ -10,6 +10,8 @@
 #include "json.hpp"
 #include "providedFunctions.h"
 #include "spline.h"
+#include "Ego.h"
+#include "Vehicle.h"
 #include "constants.h"
 #include "helperFunctions.h"
 
@@ -32,17 +34,6 @@ string hasData(string s) {
   }
   return "";
 }
-
-enum vehicle_state
-{
-    keep_lane = 0,
-    prepare_lane_change,
-    lane_change
-    // prepare_lane_change_left,
-    // prepare_lane_change_right,
-    // lane_change_left,
-    // lane_change_right
-};
 
 int main() {
   uWS::Hub h;
@@ -81,8 +72,11 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
+  // cout.precision(3);
+
   // enum to control state machine
-  vehicle_state ego_state = keep_lane;
+  Ego ego;
+  // vehicle_state ego_state = keep_lane;
 
   // Start in the middle lane
   int current_lane = 1;
@@ -93,18 +87,23 @@ int main() {
   // Get close to the speed limit
   double ref_vel = 0.0;
   double target_vel = MAX_VELOCITY;
+  double desired_vel = 0.0;
 
   // Bean counter to sum up the lane choice for lane change confirmation
-  int bean_count = 0;
+  int lane_bean_count = 0;
+  int safety_bean_count = 0;
 
   bool lane_changed_initialised = false;
+
+  // The choosen vector after choosing the speed
+  vector<vector<double>> choosen_trajectory;
 
   // Keep driving comfortable
   double max_acc = 8;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,
-      &ref_vel, &target_vel, &current_lane, &new_lane, &old_lane, &prev_desired_lane, &ego_state, &max_acc,
-      &bean_count, & lane_changed_initialised]
+      &ref_vel, &target_vel, &desired_vel, &current_lane, &new_lane, &old_lane, &prev_desired_lane, &ego, &max_acc,
+      &lane_bean_count, &safety_bean_count, &lane_changed_initialised, &choosen_trajectory]
       (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -124,33 +123,36 @@ int main() {
           // j[1] is the data JSON object
 
         	// Main car's localization Data
-          	double car_x = j[1]["x"];
-          	double car_y = j[1]["y"];
-          	double car_s = j[1]["s"];
-          	double car_d = j[1]["d"];
-          	double car_yaw = j[1]["yaw"];
-          	double car_speed = j[1]["speed"];
-            vector<double> car_values;
-            car_values.push_back(car_x);
-            car_values.push_back(car_y);
-            car_values.push_back(car_s);
-            car_values.push_back(car_d);
-            car_values.push_back(car_yaw);
-            car_values.push_back(car_speed);
+          	ego.x = j[1]["x"];
+          	ego.y = j[1]["y"];
+          	ego.s = j[1]["s"];
+          	ego.d = j[1]["d"];
+          	ego.yaw = j[1]["yaw"];
+          	ego.velocity = j[1]["speed"];
+            // vector<double> car_values;
+            // car_values.push_back(car_x);
+            // car_values.push_back(car_y);
+            // car_values.push_back(car_s);
+            // car_values.push_back(car_d);
+            // car_values.push_back(car_yaw);
+            // car_values.push_back(car_speed);
 
           	// Previous path data given to the Planner
-          	auto previous_path_x = j[1]["previous_path_x"];
-          	auto previous_path_y = j[1]["previous_path_y"];
+          	ego.previous_path_x = j[1]["previous_path_x"];
+          	ego.previous_path_y = j[1]["previous_path_y"];
           	// Previous path's end s and d values
-          	double end_path_s = j[1]["end_path_s"];
-          	double end_path_d = j[1]["end_path_d"];
+          	ego.end_path_s = j[1]["end_path_s"];
+          	ego.end_path_d = j[1]["end_path_d"];
 
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
           	json msgJson;
 
-            int prev_size = previous_path_x.size();
+            // vector<double> frenet = getFrenet(car_x, car_y, car_yaw, map_waypoints_x, map_waypoints_y);
+            // cout << car_s << "  ,   " << frenet[0] << " ,   " << car_x << " ,   " << car_y << " ,   " << car_yaw << endl;
+
+            int prev_size = ego.previous_path_x.size();
             // Adjust the cars position to be at the end of the planned trajectory
             if (prev_size > 0)
             {
@@ -160,7 +162,7 @@ int main() {
 
             // Split vehicles by lane
             vector<vector<vector<double>>> lane_vehicles;
-            SplitVehicelsIntoLanes(sensor_fusion, lane_vehicles, car_s);
+            SplitVehicelsIntoLanes(sensor_fusion, lane_vehicles, car_s, prev_size);
 
             // Get the vehicles that are within a safety distance if the car
             vector<vector<vector<double>>> safety_vehicles;
@@ -173,11 +175,12 @@ int main() {
             int lane_middle = 2 + 4*current_lane;
             bool slow_vehicle = false;
 
+
             // Check for potential collision
             bool avoid_vehicle = CheckFrontCollision(lane_vehicles[current_lane], car_s, prev_size, target_vel);
             // Run the collision detection on the new lane as well to make sure we dont clip the car in front
 
-            if (ego_state == lane_change)
+            if (ego.current_state == lane_change)
                 avoid_vehicle = avoid_vehicle || CheckFrontCollision(lane_vehicles[new_lane], car_s, prev_size, target_vel);
 
             // Lanes vector. Here because it will be adjusted when changing lanes
@@ -188,44 +191,53 @@ int main() {
 
             // cout << "Vehicle State: " << ego_state << endl;
             // BEHAVIOUR PLANNING
-            switch (ego_state)
+            switch (ego.current_state)
             {
                 case keep_lane:
                 {
-                    // slow_vehicle = CheckSlowVehicle(safety_vehicles[current_lane], car_s, prev_size, target_vel);
-                    // if (slow_vehicle)
-                    // {
-                    //     // Choose lane return -1 for left change, 0 for stay, 1 for right change
-                    //     new_lane = current_lane + ChooseLane(safety_vehicles, current_lane, car_s);
-                    //     if (new_lane != current_lane)
-                    //         ego_state = prepare_lane_change;
-                    // }
-                    // else
-                    //     target_vel = MAX_VELOCITY;
-                    // // maybe move back to the middle when empty
+                    cout << flush << endl;
                     new_lane = ChooseLane(relevant_vehicles, target_vel, ref_vel, current_lane, previous_path_x, previous_path_y, car_values,
                                         map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                    new_lane = ConfirmLaneChange(new_lane, current_lane, prev_desired_lane, bean_count);
-
-                    target_vel = ChooseSpeed(relevant_vehicles, ref_vel, new_lane, current_lane,
-                        previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                    new_lane = ConfirmLaneChange(new_lane, current_lane, prev_desired_lane, lane_bean_count);
 
                     if (new_lane != current_lane)
-                        ego_state = prepare_lane_change;
+                    {
+                        ego.current_state = prepare_lane_change;
+                        break;
+                    }
+
+                    target_vel = ChooseSpeed(relevant_vehicles, ref_vel, new_lane, current_lane,
+                        previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y, choosen_trajectory);
+                    // target_vel = desired_vel;
 
                     break;
                 }
                 case prepare_lane_change:
                 {
-                    if (CheckLaneIsSafe(safety_vehicles[new_lane]))
+                    desired_vel = ChooseSpeed(relevant_vehicles, ref_vel, new_lane, current_lane,
+                        previous_path_x, previous_path_y, car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y, choosen_trajectory);
+
+                    bool slow_down = false;
+                    bool safe = CheckLaneIsSafe(slow_down, safety_vehicles, choosen_trajectory, map_waypoints_s, map_waypoints_x, map_waypoints_y, current_lane, new_lane);
+                    if (ConfirmSafe(safe, safety_bean_count))
                     {
-                        // MAKE SURE NOT TOO CLOSE TO VEHICLE IN FRONT
-                        ego_state = lane_change;
-                        target_vel = MAX_VELOCITY;
+                        if (slow_down)
+                        {
+                            target_vel -= 0.112;
+                            cout << "--- Slowing Down To Change" << endl;
+                        }
+                        else
+                        {
+                            ego.current_state = lane_change;
+                            target_vel = desired_vel;
+                            old_lane = current_lane;
+                        }
+
                     }
-                    else
+                    else if (safe == false)
                     {
-                        ego_state = keep_lane;
+                        cout << "--- Tried To Change But Not Safe" << endl;
+                        ego.current_state = keep_lane;
                     }
                     break;
                 }
@@ -240,24 +252,32 @@ int main() {
                     if ( abs(current_lane-new_lane) > 1)
                     {
                         lanes[0] = current_lane + (new_lane-current_lane)/2;
+                        lanes[1] = current_lane + (new_lane-current_lane)/2;
+                        lanes[2] = current_lane + (new_lane-current_lane)/2;
                         new_middle = 2+4*(current_lane+ (new_lane-current_lane)/2);
-                        lane_middle_tol = 1.7;
                     }
                     else
                     {
-                        lanes[0]= new_lane;
+                        lanes[0] = new_lane;
+                        lanes[1] = new_lane;
+                        lanes[2] = new_lane;
                         new_middle = 2+4*new_lane;
                     }
-                    lanes[1] = new_lane;
-                    lanes[2] = new_lane;
+                    // lanes[1] = new_lane;
+                    // lanes[2] = new_lane;
+
                     // Update the lane
                     if (car_d>new_middle-lane_middle_tol && car_d<new_middle+lane_middle_tol)
                         current_lane = GetLane(car_d);
 
+
                     if (current_lane == new_lane)
                     {
-                        current_lane = new_lane;
-                        ego_state = keep_lane;
+                        ego.current_state = keep_lane;
+                    }
+                    else if (current_lane != old_lane) // Checking it is a double lane change
+                    {
+                        ego.current_state = prepare_lane_change;
                     }
 
 
@@ -282,6 +302,12 @@ int main() {
                 default:
                     break;
             }
+            // vector<int> lanes;
+            // lanes.push_back(1);
+            // lanes.push_back(1);
+            // lanes.push_back(1);
+            // target_vel=49.5;
+            // bool avoid_vehicle = false;
             vector<vector<double>> next_xy = CreateTrajectory(lanes,
                 target_vel, ref_vel, 50, avoid_vehicle, previous_path_x, previous_path_y,
                 car_values, map_waypoints_s, map_waypoints_x, map_waypoints_y);
