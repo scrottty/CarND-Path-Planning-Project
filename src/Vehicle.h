@@ -5,6 +5,7 @@
 
 class Vehicle
 {
+public:
     double ID;
     double x;
     double y;
@@ -17,9 +18,8 @@ class Vehicle
     double velocity_mph;
     double relative_dist;
 
-public:
     Vehicle(double ID, double x, double y, double vx, double vy, double s, double d);
-    double CalcPositionForward(int stepsForward);
+    double CalcPositionForward (int stepsForward) const;
     void CalcVelocity();
 };
 
@@ -42,7 +42,7 @@ void Vehicle::CalcVelocity()
     velocity_mph = velocity*2.24;
 }
 
-double Vehicle::CalcPositionForward(int stepsForward)
+double Vehicle::CalcPositionForward(int stepsForward) const
 {
     return s+(double)stepsForward*0.02*velocity;
 }

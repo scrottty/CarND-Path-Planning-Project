@@ -6,6 +6,10 @@
 
 #IncludeRegexTransform: 
 
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Ego.h
+vector
+-
+
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Eigen-3.3/Eigen/Cholesky
 Core
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Eigen-3.3/Eigen/Core
@@ -772,6 +776,10 @@ lapacke_mangling.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Eigen-3.3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
 
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Vehicle.h
+math.h
+-
+
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
 vector
 -
@@ -787,6 +795,8 @@ providedFunctions.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/providedFunctions.h
 constants.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
+Vehicle.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Vehicle.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/helperFunctions.h
 vector
@@ -807,6 +817,10 @@ spline.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
 costFunctions.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/costFunctions.h
+Vehicle.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Vehicle.h
+Ego.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Ego.h
 
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/json.hpp
 algorithm
@@ -889,6 +903,10 @@ providedFunctions.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/providedFunctions.h
 spline.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/spline.h
+Ego.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Ego.h
+Vehicle.h
+/Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/Vehicle.h
 constants.h
 /Users/Ollie/Documents/CarND/CarND-Path-Planning-Project/src/constants.h
 helperFunctions.h
